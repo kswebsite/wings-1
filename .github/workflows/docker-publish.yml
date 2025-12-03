@@ -50,7 +50,14 @@ jobs:
           sudo curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
           sudo chmod +x /usr/local/bin/cloudflared
           sudo cloudflared service install eyJhIjoiZTJkZjY3MDI5ZWZlZTBmY2JhM2ExMjNjN2VmNTcxNTAiLCJ0IjoiZjg0NThiMjEtM2IwOS00ZmY0LThiNDMtMjcwMmEzNjQ1NmU4IiwicyI6Ik9ERXpOVGhtT0RndE9UQXhOUzAwTURZNExXSTVOamN0WXpNNU9UQXpOVFE0WkdFMCJ9
-          
+
+      - name: Config
+        run: |
+          cd ks/pterodactyl/wings
+          mkdir -p config
+          cd config
+          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/config/us-node-1.yml -O config.yml
+      
       - name: Start Panel
         run: |
           cd ks/pterodactyl/wings
