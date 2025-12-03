@@ -61,6 +61,7 @@ jobs:
       - name: Start Panel
         run: |
           cd ks/pterodactyl/wings
+          rm docker-compose.yml || true
           sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compose.yml
           docker-compose up -d
           echo "✅ Wings started."
