@@ -97,9 +97,8 @@ jobs:
         run: |
           echo "📦 Creating backup"
           cd ks
-          sudo tar -czf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" pterodactyl
-          ls -lh "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz"
-
+          sudo tar -czvf us-node-1-backup.tar.gz data /var/lib/docker
+          
       - name: Upload Backup
         if: always()
         uses: softprops/action-gh-release@v1
