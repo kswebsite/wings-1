@@ -8,11 +8,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: pterodactyl
+  group: wings
   cancel-in-progress: true
 
 jobs:
-  panel:
+  wings:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -23,174 +23,159 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-      - name: Download latest backup from Releases
+      - name: Download latest Wings backup
         continue-on-error: true
         uses: robinraju/release-downloader@v1.11
         with:
-          tag: panel-backups
-          fileName: "pterodactyl-backup.tar.gz"
+          tag: wings-backups
+          fileName: "wings-backup.tar.gz.part*"
           out-file-path: "."
 
-      - name: Restore backup
+      - name: Restore backup (if exists)
         run: |
-          sudo mkdir -p ks
-          cd ks
-          if [ -f "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" ]; then
-            echo "🔄 Found backup"
-            sudo rm -rf pterodactyl
-            sudo tar -xzf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" -C .
+          sudo mkdir -p ks/wings
+
+          PARTS=($(ls wings-backup.tar.gz.part* 2>/dev/null || true))
+          if [ ${#PARTS[@]} -gt 0 ]; then
+            echo "🔄 Found split backup parts"
+            cat wings-backup.tar.gz.part* > merged.tar.gz
+            sudo rm -rf ks/wings/data
+            sudo tar -xzf merged.tar.gz -C ks/wings
             echo "✅ Backup restored"
           else
-            echo "⚠️ No backup found, creating fresh directory"
-            sudo mkdir -p pterodactyl/panel
+            echo "⚠️ No backup found — creating fresh directory"
+            sudo mkdir -p ks/wings/data
           fi
 
-      - name: Cloudflare Tunnel
+      - name: Install Cloudflare Tunnel
         run: |
           sudo curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
           sudo chmod +x /usr/local/bin/cloudflared
-          sudo cloudflared service install eyJhIjoiZTJkZjY3MDI5ZWZlZTBmY2JhM2ExMjNjN2VmNTcxNTAiLCJ0IjoiYTNkM2Y0YTctMTg5OS00YWRlLWE2ZWEtMDZjYTk3YjNiNzM0IiwicyI6Ik9HWm1ZemxtTkdJdFpXUXhPUzAwTmpFeExUazFaR1V0TnpCak5qTmpOVE15TURBeiJ9
+          sudo cloudflared service install YOUR_TOKEN_HERE
 
-      - name: Start Panel
+      - name: Start Wings
         run: |
-          cd ks/pterodactyl/panel
+          cd ks/wings
           sudo rm -f docker-compose.yml || true
-          sudo wget https://raw.githubusercontent.com/kswebsite/panel/refs/heads/main/docker-compose.yml
-          docker-compose up -d
-          echo "✅ Panel started."
+          cat << 'EOF' > docker-compose.yml
+version: '3.8'
 
-      - name: Start Tmate (Only on error)
-        if: always()
+services:
+  wings:
+    image: ghcr.io/pterodactyl/wings:latest
+    restart: always
+    networks:
+      - wings0
+    ports:
+      - "8080:8080"
+      - "2022:2022"
+    tty: true
+    environment:
+      TZ: "UTC"
+      WINGS_UID: 988
+      WINGS_GID: 988
+      WINGS_USERNAME: pterodactyl
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - ./config:/etc/pterodactyl
+      - ./data:/var/lib/pterodactyl
+      - ./logs:/var/log/pterodactyl
+      - ./tmp:/tmp/pterodactyl
+      - ./certs:/etc/letsencrypt
+      - /etc/ssl/certs:/etc/ssl/certs:ro
+
+networks:
+  wings0:
+    name: wings0
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: wings0
+EOF
+          docker-compose up -d
+          echo "🐦 Wings started."
+
+      - name: Start Tmate (on error only)
+        if: failure()
         run: |
           curl -sL https://github.com/tmate-io/tmate/releases/latest/download/tmate-2.4.0-static-linux-amd64.tar.xz | tar -xJ
-          sudo mv tmate-2.4.0-static-linux-amd64/tmate /usr/local/bin/ || true
+          sudo mv tmate-2.4.0-static-linux-amd64/tmate /usr/local/bin/
           tmate -S /tmp/tmate.sock new-session -d
           tmate -S /tmp/tmate.sock wait tmate-ready
           tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' || true
-          
+
       - name: Keep Alive
         run: |
-          echo "⏳ Keeping workflow alive"
+          echo "⏳ Workflow keep alive"
           sleep 20000
 
-      - name: Error Delay
-        if: failure()
-        run: |
-          echo "❌ Error detected. Waiting before shutdown..."
-          sleep 500
-
-      - name: Stop Panel
+      - name: Stop Wings
         if: always()
         run: |
-          cd ks/pterodactyl/panel
+          cd ks/wings
           docker-compose down
-          echo "✅ Panel stopped."
+          echo "🛑 Wings stopped."
 
-      - name: Create Backup
+      - name: Create Split Backup (1.75GB parts)
         if: always()
         run: |
-          echo "📦 Creating backup"
+          echo "📦 Creating split backup"
           cd ks
-          sudo tar -czf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" pterodactyl
-          ls -lh "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz"
+          sudo tar -czf wings-backup.tar.gz wings
+          split -b 1750M wings-backup.tar.gz wings-backup.tar.gz.part
+          ls -lh wings-backup.tar.gz.part*
 
-      - name: Upload Backup
+      - name: Upload Split Backup
         if: always()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: panel-backups
-          name: "Latest Pterodactyl Backup"
-          body: "Full backup of ks/pterodactyl"
-          files: pterodactyl-backup.tar.gz
+          tag_name: wings-backups
+          name: "Latest Wings Backup"
+          body: "Backup split into 1.75GB parts"
+          files: |
+            wings-backup.tar.gz.part*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete ONLY non-running workflow runs
+      - name: Delete non-running old workflow runs
         if: always()
         env:
           REPO: ${{ github.repository }}
           SELF_RUN_ID: ${{ github.run_id }}
-          # Use your PAT stored as GH_PAT. Create it with repo + workflow scopes.
-          # If GH_PAT is missing the script falls back to GITHUB_TOKEN, but that may still fail.
           TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
           set -euo pipefail
 
-          if [ -z "$TOKEN" ]; then
-            echo "ERROR: No token provided. Set secrets.GH_PAT or rely on github.token."
-            exit 1
-          fi
-
-          echo "Using token from secrets (hidden). This workflow ID = $SELF_RUN_ID"
           PAGE=1
           PER_PAGE=100
 
           while :; do
-            echo "--- fetching page $PAGE"
             RESP=$(curl -sS -H "Accept: application/vnd.github+json" \
               -H "Authorization: token $TOKEN" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/$REPO/actions/runs?per_page=$PER_PAGE&page=$PAGE")
 
-            # if empty or no workflow_runs, break
             COUNT=$(echo "$RESP" | jq '.workflow_runs | length')
-            if [ "$COUNT" -eq 0 ]; then
-              echo "No more runs on page $PAGE — exiting."
-              break
-            fi
+            [ "$COUNT" -eq 0 ] && break
 
-            echo "Found $COUNT runs on page $PAGE"
-
-            echo "$RESP" | jq -c '.workflow_runs[] | {id: .id, status: .status, name: .name}' | while read -r row; do
+            echo "$RESP" | jq -c '.workflow_runs[]' | while read -r row; do
               ID=$(echo "$row" | jq -r '.id')
               STATUS=$(echo "$row" | jq -r '.status')
-              NAME=$(echo "$row" | jq -r '.name')
 
-              # skip current run and active runs
-              if [ "$ID" = "$SELF_RUN_ID" ]; then
-                echo "Skipping self run $ID ($NAME)"
-                continue
-              fi
-              if [ "$STATUS" = "in_progress" ] || [ "$STATUS" = "queued" ]; then
-                echo "Skipping active run $ID (status: $STATUS)"
-                continue
-              fi
+              [ "$ID" = "$SELF_RUN_ID" ] && continue
+              [ "$STATUS" = "in_progress" ] && continue
+              [ "$STATUS" = "queued" ] && continue
 
-              echo "Attempting to delete run $ID (status: $STATUS, name: $NAME)..."
-
-              HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" -X DELETE \
-                -H "Accept: application/vnd.github+json" \
+              curl -sS -X DELETE \
                 -H "Authorization: token $TOKEN" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                "https://api.github.com/repos/$REPO/actions/runs/$ID" 2> /tmp/delete_resp)
-
-              # print any message returned
-              if [ -s /tmp/delete_resp ]; then
-                echo "API response: $(cat /tmp/delete_resp)"
-              fi
-
-              if [ "$HTTP" = "204" ] || [ "$HTTP" = "202" ] || [ "$HTTP" = "200" ]; then
-                echo "Deleted run $ID successfully (HTTP $HTTP)"
-              else
-                echo "Failed to delete run $ID (HTTP $HTTP)."
-                # Common reason: 403 Resource not accessible by integration (token lacks permission)
-                if [ "$HTTP" = "403" ]; then
-                  echo "403 error — likely the token used does not have permission to delete this run."
-                  echo "Use a PAT with 'repo' and 'workflow' scopes stored in secrets.GH_PAT, or ensure GITHUB_TOKEN has actions: write and org policies allow delete from actions."
-                fi
-              fi
-
-              # small sleep to avoid hitting secondary rate limits
+                "https://api.github.com/repos/$REPO/actions/runs/$ID"
               sleep 1
             done
-
-            # next page
             PAGE=$((PAGE+1))
-            # safety — if you want to stop after N pages, add a guard here
           done
 
-          echo "Cleanup complete."
-          
       - name: Restart Workflow
         if: always()
         uses: benc-uk/workflow-dispatch@v1
