@@ -8,7 +8,7 @@ services:
       - wings0
     ports:
       - "8080:8080"
-      - "2022:2022
+      - "2022:2022"
       - "443:443"
     tty: true
     environment:
@@ -23,7 +23,7 @@ services:
       - ./data:/var/lib/pterodactyl
       - ./data/logs:/var/log/pterodactyl
       - ./data/tmp:/tmp/pterodactyl
-      - ./data/certs:/etc/letsencrypt   # for SSL if using Let's Encrypt
+      - ./data/certs:/etc/letsencrypt
       - /etc/ssl/certs:/etc/ssl/certs:ro
 
 networks:
