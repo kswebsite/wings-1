@@ -1,4 +1,4 @@
-name: Wings
+name: Wings 5
 
 on:
   workflow_dispatch:
