@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  panel:
+  us-node-1:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -52,7 +52,7 @@ jobs:
 
       - name: Start Panel
         run: |
-          cd ks/pterodactyl/panel
+          cd ks/pterodactyl/wings
           echo "✅ Panel started."
 
       - name: Start Tmate (Only on error)
