@@ -87,8 +87,8 @@ jobs:
         run: |
           echo "📦 Creating backup"
           cd ks
-          sudo tar -czf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" pterodactyl
-          ls -lh "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz"
+          sudo tar -czf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" pterodactyl
+          ls -lh "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz"
 
       - name: Upload Backup
         if: always()
@@ -97,7 +97,7 @@ jobs:
           tag_name: panel-backups
           name: "Latest Pterodactyl Backup"
           body: "Full backup of ks/pterodactyl"
-          files: pterodactyl-backup.tar.gz
+          files: us-node-1-backup.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
