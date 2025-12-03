@@ -54,7 +54,7 @@ jobs:
       - name: Config
         run: |
           cd ks/pterodactyl/wings
-          mkdir -p config
+          sudo mkdir -p config
           cd config
           sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/config/us-node-1.yml -O config.yml
       
@@ -200,7 +200,7 @@ jobs:
         if: always()
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: "Panel"
+          workflow: "Wings"
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
           
