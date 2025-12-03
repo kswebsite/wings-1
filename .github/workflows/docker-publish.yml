@@ -1,4 +1,4 @@
-name: Panel
+name: Wings
 
 on:
   workflow_dispatch:
@@ -28,7 +28,7 @@ jobs:
         uses: robinraju/release-downloader@v1.11
         with:
           tag: panel-backups
-          fileName: "pterodactyl-backup.tar.gz"
+          fileName: "us-node-1-backup.tar.gz"
           out-file-path: "."
 
       - name: Restore backup
