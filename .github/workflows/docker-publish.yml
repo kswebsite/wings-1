@@ -27,7 +27,7 @@ jobs:
         continue-on-error: true
         uses: robinraju/release-downloader@v1.11
         with:
-          tag: panel-backups
+          tag: wings-backups
           fileName: "us-node-1-backup.tar.gz"
           out-file-path: "."
 
@@ -49,11 +49,13 @@ jobs:
         run: |
           sudo curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
           sudo chmod +x /usr/local/bin/cloudflared
-
+          sudo cloudflared service install eyJhIjoiZTJkZjY3MDI5ZWZlZTBmY2JhM2ExMjNjN2VmNTcxNTAiLCJ0IjoiZjg0NThiMjEtM2IwOS00ZmY0LThiNDMtMjcwMmEzNjQ1NmU4IiwicyI6Ik9ERXpOVGhtT0RndE9UQXhOUzAwTURZNExXSTVOamN0WXpNNU9UQXpOVFE0WkdFMCJ9
+          
       - name: Start Panel
         run: |
           cd ks/pterodactyl/wings
-          echo "✅ Panel started."
+          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compoes.yml
+          echo "✅ Wings started."
 
       - name: Start Tmate (Only on error)
         if: always()
@@ -75,12 +77,12 @@ jobs:
           echo "❌ Error detected. Waiting before shutdown..."
           sleep 500
 
-      - name: Stop Panel
+      - name: Stop Wings
         if: always()
         run: |
-          cd ks/pterodactyl/panel
+          cd ks/pterodactyl/wings
           docker-compose down
-          echo "✅ Panel stopped."
+          echo "✅ Wings stopped."
 
       - name: Create Backup
         if: always()
@@ -94,7 +96,7 @@ jobs:
         if: always()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: panel-backups
+          tag_name: wings-backups
           name: "Latest Pterodactyl Backup"
           body: "Full backup of ks/pterodactyl"
           files: us-node-1-backup.tar.gz
