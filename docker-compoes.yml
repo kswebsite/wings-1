@@ -21,9 +21,9 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers
       - ./config:/etc/pterodactyl
       - ./data:/var/lib/pterodactyl
-      - ./logs:/var/log/pterodactyl
-      - ./tmp:/tmp/pterodactyl
-      - ./certs:/etc/letsencrypt   # for SSL if using Let's Encrypt
+      - ./data/logs:/var/log/pterodactyl
+      - ./data/tmp:/tmp/pterodactyl
+      - ./data/certs:/etc/letsencrypt   # for SSL if using Let's Encrypt
       - /etc/ssl/certs:/etc/ssl/certs:ro
 
 networks:
