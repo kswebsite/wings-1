@@ -61,7 +61,8 @@ jobs:
       - name: Start Panel
         run: |
           cd ks/pterodactyl/wings
-          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compoes.yml
+          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compose.yml
+          docker-compose up -d
           echo "✅ Wings started."
 
       - name: Start Tmate (Only on error)
