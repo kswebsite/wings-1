@@ -1,4 +1,4 @@
-name: Wings 5
+name: Panel
 
 on:
   workflow_dispatch:
@@ -8,203 +8,145 @@ permissions:
   contents: write
 
 concurrency:
-  group: pterodactyl-wings
+  group: pterodactyl
   cancel-in-progress: true
 
-env:
-  BACKUP_BASENAME: pterodactyl-wings-backup.tar.gz
-  SPLIT_SIZE: 1750M    # split size (1.75GB) — GitHub max single file ~2GB, keep below to be safe
-  WORKDIR: ${{ github.workspace }}/ks/wings
-
 jobs:
-  wings:
+  panel:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Docker & docker-compose (if needed)
+      - name: Install Docker Compose
         run: |
-          # Docker is available on github-hosted runners, but ensure docker-compose CLI installed for compose v1 compatibility
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
-          # Install docker-compose binary (classic) — safe fallback
           sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version || true
-          docker --version || true
+          docker-compose --version
 
-      - name: Download latest backup from Releases (try single file or parts)
+      - name: Download latest backup from Releases
         continue-on-error: true
         uses: robinraju/release-downloader@v1.11
         with:
-          tag: wings-backups
-          fileName: ${{ env.BACKUP_BASENAME }}
+          tag: panel-backups
+          fileName: "pterodactyl-backup.tar.gz"
           out-file-path: "."
 
-      - name: Attempt to download split parts (if present)
-        continue-on-error: true
+      - name: Restore backup
         run: |
-          set -eo pipefail
-          # Try to download any parts (softprops/release-downloader doesn't support globs; try common part suffixes)
-          for p in $(seq -f "%02g" 0 99); do
-            FILE="${{ env.BACKUP_BASENAME }}.part${p}"
-            echo "Attempting to download $FILE"
-            robinraju_release_downloader_output=$(mktemp)
-            if robinraju_status=$(gh api repos/${{ github.repository }}/releases --paginate -q '.[] | {id: .id, tag_name: .tag_name}' 2>/dev/null || true); then
-              # This step is best-effort; actual direct release-download automation for parts is handled during upload below.
-              :
-            fi
-            # No fatal error if not found
-          done
-        shell: bash
-
-      - name: Restore backup (reassemble parts if necessary)
-        run: |
-          set -eo pipefail
-          mkdir -p ks && cd ks
-          # If full backup present in workspace, use it
-          if [ -f "${{ github.workspace }}/${{ env.BACKUP_BASENAME }}" ]; then
-            echo "Found single backup file in workspace."
-            mv "${{ github.workspace }}/${{ env.BACKUP_BASENAME }}" .
+          sudo mkdir -p ks
+          cd ks
+          if [ -f "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" ]; then
+            echo "🔄 Found backup"
+            sudo rm -rf pterodactyl
+            sudo tar -xzf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" -C .
+            echo "✅ Backup restored"
           else
-            # Check for parts (pattern created at upload: pterodactyl-wings-backup.tar.gz.part.*)
-            if ls "${{ github.workspace }}/${{ env.BACKUP_BASENAME }}.part."* 1> /dev/null 2>&1; then
-              echo "Found parts, reassembling..."
-              cat "${{ github.workspace }}/${{ env.BACKUP_BASENAME }}.part."* > "${{ env.BACKUP_BASENAME }}"
-              echo "Reassembly done."
-            else
-              echo "No backup found — creating fresh wings directory"
-              mkdir -p wings
-            fi
+            echo "⚠️ No backup found, creating fresh directory"
+            sudo mkdir -p pterodactyl/panel
           fi
 
-          # If we have a backup file now, extract it
-          if [ -f "${{ env.BACKUP_BASENAME }}" ]; then
-            echo "Extracting backup..."
-            tar -xzf "${{ env.BACKUP_BASENAME }}" -C .
-            echo "Extracted."
-          fi
+      - name: Cloudflare Tunnel
+        run: |
+          sudo curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
+          sudo chmod +x /usr/local/bin/cloudflared
+          sudo cloudflared service install eyJhIjoiZTJkZjY3MDI5ZWZlZTBmY2JhM2ExMjNjN2VmNTcxNTAiLCJ0IjoiYTNkM2Y0YTctMTg5OS00YWRlLWE2ZWEtMDZjYTk3YjNiNzM0IiwicyI6Ik9HWm1ZemxtTkdJdFpXUXhPUzAwTmpFeExUazFaR1V0TnpCak5qTmpOVE15TURBeiJ9
 
-      - name: Write docker-compose.yml for Wings (if you want to overwrite from workflow)
+      - name: Start Panel
         run: |
-          mkdir -p "${{ env.WORKDIR }}"
-          rm docker-compoes.yml
-          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compoes.yml
-          
-      - name: Start Wings (docker-compose up)
-        run: |
-          set -eo pipefail
-          cd "${{ env.WORKDIR }}"
-          # ensure env/config exists, otherwise create minimal folder
-          mkdir -p config data logs tmp certs
-          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/config/us-node-1.yml
-          mv config/us-node-1.yml config/config.yml
-          docker-compose pull || true
-          docker-compose up -d --remove-orphans
-          docker-compose ps || true
+          cd ks/pterodactyl/panel
+          sudo rm -f docker-compose.yml || true
+          sudo wget https://raw.githubusercontent.com/kswebsite/panel/refs/heads/main/docker-compose.yml
+          docker-compose up -d
+          echo "✅ Panel started."
 
-      - name: Keep Alive (prevent quick job exit)
+      - name: Start Tmate (Only on error)
+        if: always()
         run: |
-          echo "Keeping runner alive briefly"
-          sleep 30
-
-      # tmate session on failure only
-      - name: Start Tmate (only on failure)
-        if: failure()
-        run: |
-          set -eo pipefail
           curl -sL https://github.com/tmate-io/tmate/releases/latest/download/tmate-2.4.0-static-linux-amd64.tar.xz | tar -xJ
           sudo mv tmate-2.4.0-static-linux-amd64/tmate /usr/local/bin/ || true
           tmate -S /tmp/tmate.sock new-session -d
           tmate -S /tmp/tmate.sock wait tmate-ready
-          echo "Tmate SSH connection:"
           tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' || true
-          echo "Tmate web connection:"
-          tmate -S /tmp/tmate.sock display -p '#{tmate_web}' || true
+          
+      - name: Keep Alive
+        run: |
+          echo "⏳ Keeping workflow alive"
+          sleep 20000
 
-      - name: Error Delay (only when failure)
+      - name: Error Delay
         if: failure()
         run: |
-          echo "Failure detected; sleeping for debug window"
-          sleep 300
+          echo "❌ Error detected. Waiting before shutdown..."
+          sleep 500
 
-      - name: Stop Wings (always)
+      - name: Stop Panel
         if: always()
         run: |
-          set -eo pipefail
-          cd "${{ env.WORKDIR }}"
-          docker-compose down || true
-          echo "Panel stopped."
+          cd ks/pterodactyl/panel
+          docker-compose down
+          echo "✅ Panel stopped."
 
-      - name: Create Backup (always)
+      - name: Create Backup
         if: always()
         run: |
-          set -eo pipefail
-          mkdir -p ks
+          echo "📦 Creating backup"
           cd ks
-          # We will backup the wings directory
-          tar -czf "${{ env.BACKUP_BASENAME }}" wings || true
-          ls -lh "${{ env.BACKUP_BASENAME }}" || true
+          sudo tar -czf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" pterodactyl
+          ls -lh "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz"
 
-          # If file exists and is > 1 byte, split into 1.75GB chunks
-          if [ -f "${{ env.BACKUP_BASENAME }}" ]; then
-            echo "Splitting backup into parts of size $SPLIT_SIZE..."
-            # split output files: pterodactyl-wings-backup.tar.gz.part.aa, .ab, ... but we will create numeric suffixes
-            split -b "${{ env.SPLIT_SIZE }}" -a 3 --numeric-suffixes=0 --additional-suffix="" "${{ env.BACKUP_BASENAME }}" "${{ env.BACKUP_BASENAME }}.part."
-            # produce a small manifest listing the parts
-            ls -lh "${{ env.BACKUP_BASENAME }}".part.* || true
-          else
-            echo "No backup created, skipping split."
-          fi
-
-      - name: Upload Backup parts to GitHub Release
+      - name: Upload Backup
         if: always()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: wings-backups
-          name: "Latest Wings Backup"
-          body: "Full backup of ks/wings (split into parts if needed)"
-          files: |
-            ks/${{ env.BACKUP_BASENAME }}.part.*
-            # fallback: single file if parts not created
-            ks/${{ env.BACKUP_BASENAME }}
+          tag_name: panel-backups
+          name: "Latest Pterodactyl Backup"
+          body: "Full backup of ks/pterodactyl"
+          files: pterodactyl-backup.tar.gz
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete ONLY non-running workflow runs
         if: always()
         env:
           REPO: ${{ github.repository }}
           SELF_RUN_ID: ${{ github.run_id }}
+          # Use your PAT stored as GH_PAT. Create it with repo + workflow scopes.
+          # If GH_PAT is missing the script falls back to GITHUB_TOKEN, but that may still fail.
           TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
           set -euo pipefail
+
           if [ -z "$TOKEN" ]; then
             echo "ERROR: No token provided. Set secrets.GH_PAT or rely on github.token."
             exit 1
           fi
+
           echo "Using token from secrets (hidden). This workflow ID = $SELF_RUN_ID"
           PAGE=1
           PER_PAGE=100
+
           while :; do
             echo "--- fetching page $PAGE"
             RESP=$(curl -sS -H "Accept: application/vnd.github+json" \
               -H "Authorization: token $TOKEN" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/$REPO/actions/runs?per_page=$PER_PAGE&page=$PAGE")
+
+            # if empty or no workflow_runs, break
             COUNT=$(echo "$RESP" | jq '.workflow_runs | length')
             if [ "$COUNT" -eq 0 ]; then
               echo "No more runs on page $PAGE — exiting."
               break
             fi
+
             echo "Found $COUNT runs on page $PAGE"
+
             echo "$RESP" | jq -c '.workflow_runs[] | {id: .id, status: .status, name: .name}' | while read -r row; do
               ID=$(echo "$row" | jq -r '.id')
               STATUS=$(echo "$row" | jq -r '.status')
               NAME=$(echo "$row" | jq -r '.name')
+
+              # skip current run and active runs
               if [ "$ID" = "$SELF_RUN_ID" ]; then
                 echo "Skipping self run $ID ($NAME)"
                 continue
@@ -213,34 +155,47 @@ jobs:
                 echo "Skipping active run $ID (status: $STATUS)"
                 continue
               fi
+
               echo "Attempting to delete run $ID (status: $STATUS, name: $NAME)..."
+
               HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" -X DELETE \
                 -H "Accept: application/vnd.github+json" \
                 -H "Authorization: token $TOKEN" \
                 -H "X-GitHub-Api-Version: 2022-11-28" \
-                "https://api.github.com/repos/$REPO/actions/runs/$ID" 2> /tmp/delete_resp) || true
+                "https://api.github.com/repos/$REPO/actions/runs/$ID" 2> /tmp/delete_resp)
+
+              # print any message returned
               if [ -s /tmp/delete_resp ]; then
                 echo "API response: $(cat /tmp/delete_resp)"
               fi
+
               if [ "$HTTP" = "204" ] || [ "$HTTP" = "202" ] || [ "$HTTP" = "200" ]; then
                 echo "Deleted run $ID successfully (HTTP $HTTP)"
               else
                 echo "Failed to delete run $ID (HTTP $HTTP)."
+                # Common reason: 403 Resource not accessible by integration (token lacks permission)
                 if [ "$HTTP" = "403" ]; then
                   echo "403 error — likely the token used does not have permission to delete this run."
                   echo "Use a PAT with 'repo' and 'workflow' scopes stored in secrets.GH_PAT, or ensure GITHUB_TOKEN has actions: write and org policies allow delete from actions."
                 fi
               fi
+
+              # small sleep to avoid hitting secondary rate limits
               sleep 1
             done
-            PAGE=$((PAGE+1))
-          done
-          echo "Cleanup complete."
 
-      - name: Restart Workflow (optional)
+            # next page
+            PAGE=$((PAGE+1))
+            # safety — if you want to stop after N pages, add a guard here
+          done
+
+          echo "Cleanup complete."
+          
+      - name: Restart Workflow
         if: always()
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: "Wings"
+          workflow: "Panel"
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
+          
