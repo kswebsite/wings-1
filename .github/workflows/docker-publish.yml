@@ -91,52 +91,17 @@ jobs:
       - name: Write docker-compose.yml for Wings (if you want to overwrite from workflow)
         run: |
           mkdir -p "${{ env.WORKDIR }}"
-          cat > "${{ env.WORKDIR }}/docker-compose.yml" <<'EOF'
-version: '3.8'
-
-services:
-  wings:
-    image: ghcr.io/pterodactyl/wings:latest
-    restart: always
-    networks:
-      - wings0
-    ports:
-      - "8080:8080"
-      - "2022:2022"
-      - "443:443"
-    tty: true
-    environment:
-      TZ: "UTC"
-      WINGS_UID: 988
-      WINGS_GID: 988
-      WINGS_USERNAME: pterodactyl
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/containers:/var/lib/docker/containers
-      - ./config:/etc/pterodactyl
-      - ./data:/var/lib/pterodactyl
-      - ./logs:/var/log/pterodactyl
-      - ./tmp:/tmp/pterodactyl
-      - ./certs:/etc/letsencrypt
-      - /etc/ssl/certs:/etc/ssl/certs:ro
-
-networks:
-  wings0:
-    name: wings0
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16
-    driver_opts:
-      com.docker.network.bridge.name: wings0
-EOF
-
+          rm docker-compoes.yml
+          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compoes.yml
+          
       - name: Start Wings (docker-compose up)
         run: |
           set -eo pipefail
           cd "${{ env.WORKDIR }}"
           # ensure env/config exists, otherwise create minimal folder
           mkdir -p config data logs tmp certs
+          sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/config/us-node-1.yml
+          mv config/us-node-1.yml config/config.yml
           docker-compose pull || true
           docker-compose up -d --remove-orphans
           docker-compose ps || true
