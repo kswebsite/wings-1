@@ -35,28 +35,24 @@ jobs:
         run: |
           sudo mkdir -p ks
           cd ks
-          if [ -f "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" ]; then
+          if [ -f "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" ]; then
             echo "🔄 Found backup"
             sudo rm -rf pterodactyl
-            sudo tar -xzf "${GITHUB_WORKSPACE}/pterodactyl-backup.tar.gz" -C .
+            sudo tar -xzf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C .
             echo "✅ Backup restored"
           else
             echo "⚠️ No backup found, creating fresh directory"
-            sudo mkdir -p pterodactyl/panel
+            sudo mkdir -p pterodactyl/wings
           fi
 
       - name: Cloudflare Tunnel
         run: |
           sudo curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared
           sudo chmod +x /usr/local/bin/cloudflared
-          sudo cloudflared service install eyJhIjoiZTJkZjY3MDI5ZWZlZTBmY2JhM2ExMjNjN2VmNTcxNTAiLCJ0IjoiYTNkM2Y0YTctMTg5OS00YWRlLWE2ZWEtMDZjYTk3YjNiNzM0IiwicyI6Ik9HWm1ZemxtTkdJdFpXUXhPUzAwTmpFeExUazFaR1V0TnpCak5qTmpOVE15TURBeiJ9
 
       - name: Start Panel
         run: |
           cd ks/pterodactyl/panel
-          sudo rm -f docker-compose.yml || true
-          sudo wget https://raw.githubusercontent.com/kswebsite/panel/refs/heads/main/docker-compose.yml
-          docker-compose up -d
           echo "✅ Panel started."
 
       - name: Start Tmate (Only on error)
