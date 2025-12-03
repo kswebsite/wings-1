@@ -96,7 +96,7 @@ jobs:
         if: always()
         run: |
           echo "📦 Creating backup"
-          cd ks
+          cd ks/pterodactyl/wings
           sudo tar -czvf us-node-1-backup.tar.gz data /var/lib/docker
           
       - name: Upload Backup
