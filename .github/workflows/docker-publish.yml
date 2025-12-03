@@ -61,7 +61,7 @@ jobs:
       - name: Start Panel
         run: |
           cd ks/pterodactyl/wings
-          rm docker-compose.yml || true
+          sudo rm docker-compose.yml || true
           sudo wget https://raw.githubusercontent.com/kswebsite/wings-1/refs/heads/main/docker-compose.yml
           docker-compose up -d
           echo "✅ Wings started."
@@ -98,7 +98,7 @@ jobs:
         run: |
           echo "📦 Creating backup"
           cd ks/pterodactyl/wings
-          sudo tar -czvf us-node-1-backup.tar.gz data /var/lib/docker
+          sudo tar -czvf us-node-1-backup.tar.gz data /var/lib/pterodactyl /var/lib/docker
           
       - name: Upload Backup
         if: always()
