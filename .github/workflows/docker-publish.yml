@@ -1,4 +1,4 @@
-name: Wings
+name: Wings 5
 
 on:
   workflow_dispatch:
@@ -39,8 +39,6 @@ jobs:
             echo "🔄 Found backup"
             sudo rm -rf pterodactyl
             sudo mkdir -p pterodactyl/wings
-            sudo rm -rf /var/lib/pterodactyl
-            sudo rm -rf /var/lib/docker
             sudo tar -xzvf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C /
             echo "✅ Backup restored"
           else
