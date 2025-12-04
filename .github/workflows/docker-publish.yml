@@ -38,7 +38,10 @@ jobs:
           if [ -f "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" ]; then
             echo "🔄 Found backup"
             sudo rm -rf pterodactyl
-            sudo tar -xzf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C .
+            sudo rm -rf /var/lib/pterodactyl
+            sudo rm -rf /var/lib/docker
+            sudo rm -rf /etc/ssl/certs
+            sudo tar -xzvf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C /
             echo "✅ Backup restored"
           else
             echo "⚠️ No backup found, creating fresh directory"
@@ -98,7 +101,7 @@ jobs:
         run: |
           echo "📦 Creating backup"
           cd ks/pterodactyl/wings
-          sudo tar -czvf us-node-1-backup.tar.gz data /var/lib/pterodactyl /var/lib/docker
+          sudo tar -czvf us-node-1-backup.tar.gz /var/lib/pterodactyl /var/lib/docker /etc/ssl/certs
           
       - name: Upload Backup
         if: always()
