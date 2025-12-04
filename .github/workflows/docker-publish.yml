@@ -33,7 +33,7 @@ jobs:
 
       - name: Restore backup
         run: |
-          sudo mkdir -p ks
+          sudo mkdir -p ks/pterodactyl/wings
           cd ks
           if [ -f "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" ]; then
             echo "🔄 Found backup"
@@ -44,7 +44,6 @@ jobs:
             echo "✅ Backup restored"
           else
             echo "⚠️ No backup found, creating fresh directory"
-            sudo mkdir -p pterodactyl/wings
           fi
 
       - name: Cloudflare Tunnel
