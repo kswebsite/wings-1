@@ -18,12 +18,8 @@ services:
       WINGS_USERNAME: pterodactyl
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /var/lib/docker/containers/:/var/lib/docker/containers/
       - ./config:/etc/pterodactyl/
       - /var/lib/pterodactyl/:/var/lib/pterodactyl/
-      - /var/log/pterodactyl/:/var/log/pterodactyl/
-      - /tmp/pterodactyl/:/tmp/pterodactyl/
-      - /etc/ssl/certs:/etc/ssl/certs:ro
       
 networks:
   wings0:
