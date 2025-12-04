@@ -40,7 +40,6 @@ jobs:
             sudo rm -rf pterodactyl
             sudo rm -rf /var/lib/pterodactyl
             sudo rm -rf /var/lib/docker
-            sudo rm -rf /etc/ssl/certs
             sudo tar -xzvf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C /
             echo "✅ Backup restored"
           else
