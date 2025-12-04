@@ -33,11 +33,12 @@ jobs:
 
       - name: Restore backup
         run: |
-          sudo mkdir -p ks/pterodactyl/wings
+          sudo mkdir -p ks
           cd ks
           if [ -f "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" ]; then
             echo "🔄 Found backup"
             sudo rm -rf pterodactyl
+            sudo mkdir -p pterodactyl/wings
             sudo rm -rf /var/lib/pterodactyl
             sudo rm -rf /var/lib/docker
             sudo tar -xzvf "${GITHUB_WORKSPACE}/us-node-1-backup.tar.gz" -C /
